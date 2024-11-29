@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Stream Analysis</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .video-container {
+        margin: 20px 0;
+      }
+      #videoFeed {
+        width: 100%;
+        max-width: 640px;
+        border: 1px solid #ccc;
+      }
+      .query-container {
+        margin: 20px 0;
+      }
+      #queryInput {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      #response {
+        margin-top: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        min-height: 50px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>A Real-Time Object Detection System</h1>
+    <div>
+      <p>
+        An object detection model that can detect multiple objects in real-time
+        from a live camera feed.
+      </p>
+    </div>
+
+    <div class="video-container">
+      <img id="videoFeed" src="/video_feed" alt="Video Feed" />
+    </div>
+
+    <div class="query-container">
+      <input
+        type="text"
+        id="queryInput"
+        placeholder="Ask a question about the video..."
+      />
+      <button onclick="processQuery()">Submit</button>
+    </div>
+
+    <div id="response"></div>
+
+    <script>
+      async function processQuery() {
+        const queryInput = document.getElementById("queryInput");
+        const responseDiv = document.getElementById("response");
+
+        try {
+          const response = await fetch("/process_query", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prompt: queryInput.value,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.error) {
+            responseDiv.textContent = `Error: ${data.error}`;
+          } else {
+            responseDiv.textContent = data.response;
+          }
+        } catch (error) {
+          responseDiv.textContent = `Error: ${error.message}`;
+        }
+      }
+    </script>
+  </body>
+</html>
