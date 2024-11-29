@@ -214,5 +214,6 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ---
 
-Project maintained by [Toyyib Muhammad-Jamiu/3MTT]
-Last Updated: 29-11-2024.
+**Project maintained by Toyyib Muhammad-Jamiu**
+
+_Last Updated: 29-11-2024._
