@@ -200,10 +200,6 @@ For support:
 3. Include system information
 4. Provide reproducible steps
 
-## License
-
-This project is licensed under the MIT License - see LICENSE file for details.
-
 ## Acknowledgments
 
 - Flask framework
