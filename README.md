@@ -25,7 +25,7 @@ An advanced Flask web application that combines real-time video streaming with A
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/realtime-object-detection.git
+git clone https://github.com/Abunuman/Real-Time-ODS.git
 cd realtime-object-detection
 ```
 
