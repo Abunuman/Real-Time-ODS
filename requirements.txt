@@ -1,6 +1,6 @@
 flask>=2.0.1
 google-generativeai>=0.3.0
-gunicorn
+gunicorn==20.1.0
 langchain
 langchain-google-genai>=0.0.3
 langchain-openai>=0.0.3
