@@ -1,3 +1,4 @@
 .env
-static
-
+.venv
+.github
+=0.3.0

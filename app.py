@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, send_from_directory, Response, jsonify, request
 import cv2
 import base64
