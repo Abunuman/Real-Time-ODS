@@ -1,6 +1,7 @@
-# Real-Time Object Detection Flask Application
+# Real-Time Object Detection Application Using OpenCV and Flask
 
-![Real-Time Object Detection](img/Real-Ods2.jpg)
+![Real-Time Object Detection](img/Real-ods4.webp)
+
 An advanced Flask web application that combines real-time video streaming with AI-powered object detection and analysis. This platform leverages Google's Gemini vision model to provide intelligent analysis of live video feeds, making it perfect for real-time object detection and scene understanding.
 
 ## Key Features
