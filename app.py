@@ -2,7 +2,6 @@ from flask import Flask, send_from_directory, Response, jsonify, request
 import cv2
 import base64
 from threading import Lock, Thread
-import openai
 import os
 from dotenv import load_dotenv
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
