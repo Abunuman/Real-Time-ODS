@@ -11,4 +11,3 @@ opencv_python_headless==4.10.0.84
 Pillow
 python-dotenv>=0.19.0
 Werkzeug
-

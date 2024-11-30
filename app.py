@@ -120,26 +120,37 @@ assistant = None
 def initialize_system():
     global camera, assistant
     try:
+        # Try initializing the webcam
         camera = WebcamCapture().start()
+    except RuntimeError:
+        # Fallback to a placeholder image or default behavior
+        camera = None
+        logger.warning("Webcam initialization failed. Fallback to default behavior.")
+
+    try:
         assistant = AIAssistant()
         logger.info("System initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing system: {e}")
         raise
 
+
 def create_app():
     app = Flask(__name__)
-    
-    # Ensure the template directory exists
+
+    # Ensure the template and static directories exist
     template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
     static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-    
+
     os.makedirs(template_dir, exist_ok=True)
     os.makedirs(static_dir, exist_ok=True)
+
     
-    # Global instances
-    app.camera = None
-    app.assistant = None
+    # Initialize the system and attach global instances
+    with app.app_context():
+        initialize_system()  # Use the new initialize_system function
+        app.camera = camera
+        app.assistant = assistant
     
     @app.route('/')
     def index():
@@ -177,18 +188,9 @@ def create_app():
         except Exception as e:
             logger.error(f"Error in process_query: {e}")
             return jsonify({"error": str(e)}), 500
-
-    # Initialize the system
-    with app.app_context():
-        try:
-            app.camera = WebcamCapture().start()
-            app.assistant = AIAssistant()
-            logger.info("System initialized successfully")
-        except Exception as e:
-            logger.error(f"Error initializing system: {e}")
-            raise
-
+    
     return app
+
 
 def generate_frames(camera):
     while True:
