@@ -10,10 +10,10 @@ jobs:
       - uses: actions/checkout@v4
 
       # Set up Python environment
-      - name: Set up Python 3.11  # Changed to 3.11 for better compatibility
+      - name: Set up Python 3.12  # Changed to 3.11 for better compatibility
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       # Configure AWS credentials
       - name: Configure AWS credentials
