@@ -207,4 +207,5 @@ def generate_frames(camera):
 if __name__ == '__main__':
     load_dotenv()
     app = create_app()
-    app.run(debug=True, threaded=True)
+    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode, threaded=True)
