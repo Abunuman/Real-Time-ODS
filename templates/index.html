@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Video Stream Analysis</title>
+    <title>Real-time-ODS</title>
     <style>
+      /* Keeping your existing styles */
       body {
         font-family: Arial, sans-serif;
         max-width: 800px;
@@ -13,6 +14,7 @@
       }
       .video-container {
         margin: 20px 0;
+        position: relative;
       }
       #videoFeed {
         width: 100%;
@@ -33,6 +35,12 @@
         border: 1px solid #ccc;
         min-height: 50px;
       }
+      /* Adding styles for the webcam video */
+      #webcam {
+        width: 100%;
+        max-width: 640px;
+        border: 1px solid #ccc;
+      }
     </style>
   </head>
   <body>
@@ -45,7 +53,9 @@
     </div>
 
     <div class="video-container">
-      <img id="videoFeed" src="/video_feed" alt="Video Feed" />
+      <!-- Replace the img with video element -->
+      <video id="webcam" autoplay playsinline></video>
+      <canvas id="canvas" style="display: none"></canvas>
     </div>
 
     <div class="query-container">
@@ -60,6 +70,54 @@
     <div id="response"></div>
 
     <script>
+      // Adding the new webcam functionality
+      async function setupWebcam() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+          const videoElement = document.getElementById("webcam");
+          videoElement.srcObject = stream;
+
+          // Start sending frames to server
+          setInterval(sendFrame, 100); // Send frame every 100ms
+        } catch (error) {
+          console.error("Error accessing webcam:", error);
+          document.getElementById("response").textContent =
+            "Error accessing webcam. Please ensure you have granted camera permissions.";
+        }
+      }
+
+      // Frame sending function
+      async function sendFrame() {
+        const video = document.getElementById("webcam");
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext("2d");
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0);
+        const frameData = canvas.toDataURL("image/jpeg");
+
+        try {
+          const response = await fetch("/process_frame", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ frame: frameData }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+        } catch (error) {
+          console.error("Error sending frame:", error);
+        }
+      }
+
+      // Keeping your existing query processing function
       async function processQuery() {
         const queryInput = document.getElementById("queryInput");
         const responseDiv = document.getElementById("response");
@@ -86,6 +144,9 @@
           responseDiv.textContent = `Error: ${error.message}`;
         }
       }
+
+      // Initialize webcam when page loads
+      document.addEventListener("DOMContentLoaded", setupWebcam);
     </script>
   </body>
 </html>

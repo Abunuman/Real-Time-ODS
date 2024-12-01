@@ -11,6 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_google_genai import ChatGoogleGenerativeAI
 import logging
+import numpy as np
 from datetime import datetime
 
 load_dotenv()
@@ -188,7 +189,33 @@ def create_app():
         except Exception as e:
             logger.error(f"Error in process_query: {e}")
             return jsonify({"error": str(e)}), 500
-    
+
+    @app.route('/process_frame', methods=['POST'])
+    def process_frame():
+        try:
+            data = request.get_json()
+            if not data or 'frame' not in data:
+                return jsonify({'error': 'No frame data received'}), 400
+                
+            # Get the frame data and decode it from base64
+            frame_data = data['frame'].split(',')[1]  # Remove the data URL prefix
+            frame_bytes = base64.b64decode(frame_data)
+            frame_array = np.frombuffer(frame_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(frame_array, flags=cv2.IMREAD_COLOR)
+                
+            # Process the frame using your existing AI assistant
+            _, buffer = cv2.imencode('.jpg', frame)
+            image_base64 = base64.b64encode(buffer).decode('utf-8')
+                
+            # You can use your existing AI assistant to process the frame
+            response = app.assistant.process_query("What do you see in this frame?", image_base64)
+                
+            return jsonify({'success': True, 'analysis': response})
+                
+        except Exception as e:
+            app.logger.error(f"Error processing frame: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+        
     return app
 
 
