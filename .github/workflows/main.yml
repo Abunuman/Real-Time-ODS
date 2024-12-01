@@ -1,48 +1,27 @@
 name: Deploy to AWS
-
 on:
   push:
     branches: [main]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      # Check out the repository
+      # Check out the repository (only need this once)
       - uses: actions/checkout@v4
 
       # Set up Python environment
-      - name: Set up Python 3.12
+      - name: Set up Python 3.11  # Changed to 3.11 for better compatibility
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
-      # Configure AWS credentials for deployment
+      # Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-
-      # Install system dependencies
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopencv-dev python3-opencv portaudio19-dev ffmpeg
-          sudo apt-get clean
-
-      # Install Python dependencies
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # Build and package application
-      - name: Build and package application
-        run: |
-          zip -r deployment-package.zip . -x "*.git*"
 
       # Deploy to EC2
       - name: Deploy to EC2
@@ -52,8 +31,50 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Create and setup application directory
+            mkdir -p /home/${{ secrets.EC2_USERNAME }}/app
             cd /home/${{ secrets.EC2_USERNAME }}/app
-            git pull origin main
+
+            # Install system dependencies
+            sudo apt-get update
+            sudo apt-get install -y python3-venv python3-pip git libopencv-dev python3-opencv portaudio19-dev ffmpeg
+            
+            # Setup Python virtual environment if it doesn't exist
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+            
+            # Activate virtual environment and install/update dependencies
             source venv/bin/activate
+            
+            # Pull latest code
+            if [ -d ".git" ]; then
+              git pull origin main
+            else
+              git clone https://github.com/Abunuman/Real-Time-ODS.git .
+            fi
+            
+            # Install dependencies
+            pip install --upgrade pip
             pip install -r requirements.txt
+
+            # Create or update systemd service
+            sudo tee /etc/systemd/system/flask_app.service << EOF
+            [Unit]
+            Description=Flask App
+            After=network.target
+
+            [Service]
+            User=${{ secrets.EC2_USERNAME }}
+            WorkingDirectory=/home/${{ secrets.EC2_USERNAME }}/app
+            Environment="PATH=/home/${{ secrets.EC2_USERNAME }}/app/venv/bin"
+            ExecStart=/home/${{ secrets.EC2_USERNAME }}/app/venv/bin/python app.py
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+            # Reload and restart service
+            sudo systemctl daemon-reload
+            sudo systemctl enable flask_app
             sudo systemctl restart flask_app
