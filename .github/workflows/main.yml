@@ -10,7 +10,9 @@ jobs:
       - uses: actions/checkout@v4
 
       # Set up Python environment
-      - name: Set up Python 3.12 # Changed to 3.11 for better compatibility
+
+      - name: Set up Python 3.12  # Changed to 3.11 for better compatibility
+      
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -38,15 +40,19 @@ jobs:
             # Install system dependencies
             sudo apt-get update
             sudo apt-get install -y python3-venv python3-pip git libopencv-dev python3-opencv portaudio19-dev ffmpeg
-
+            
             # Setup Python virtual environment if it doesn't exist
             if [ ! -d "venv" ]; then
               python3 -m venv venv
             fi
 
+
             # Activate virtual environment and install/update dependencies
             source venv/bin/activate
-
+            
+            # Activate virtual environment and install/update dependencies
+            source venv/bin/activate
+            
             # Pull latest code
             if [ -d ".git" ]; then
               git pull origin main
