@@ -26,14 +26,27 @@ logger = logging.getLogger(__name__)
 
 class WebcamCapture:
     def __init__(self):
-        self.stream = cv2.VideoCapture(0)
-        if not self.stream.isOpened():
-            raise RuntimeError("Could not initialize webcam")
-        ret, self.frame = self.stream.read()
-        if not ret:
-            raise RuntimeError("Failed to capture initial frame")
-        self.running = False
-        self.lock = Lock()
+        try:
+            self.stream = cv2.VideoCapture(0)
+            if not self.stream.isOpened():
+                logger.error("Could not open webcam")
+                raise RuntimeError("Could not initialize webcam")
+            
+            for _ in range(3):  
+                ret, self.frame = self.stream.read()
+                if ret and self.frame is not None:
+                    logger.info("Successfully captured initial frame")
+                    break
+                logger.warning("Failed to capture initial frame, retrying...")
+            
+            if self.frame is None:
+                logger.error("Could not capture any frames after multiple attempts")
+                raise RuntimeError("Failed to capture initial frame")
+            self.running = False
+            self.lock = Lock()
+        except Exception as e:
+            logger.error(f"Error initializing webcam: {e}")
+            raise
 
     def start(self):
         if self.running:
@@ -47,25 +60,45 @@ class WebcamCapture:
 
     def _update(self):
         while self.running:
-            ret, frame = self.stream.read()
-            if ret:
-                with self.lock:
-                    self.frame = frame
+            try:
+                ret, frame = self.stream.read()
+                if ret and frame is not None:
+                    with self.lock:
+                        self.frame = frame
+                else:
+                    logger.warning("Failed to capture frame in _update")
+            except Exception as e:
+                logger.error(f"Error in _update: {e}")
 
     def read(self):
-        with self.lock:
-            if self.frame is None:
-                return None
-            return self.frame.copy()
+        try:
+            with self.lock:
+                if self.frame is None:
+                    logger.warning("Frame is None in read()")
+                    return None
+                frame_copy = self.frame.copy()
+                if frame_copy is None:
+                    logger.warning("Frame copy is None")
+                    return None
+                return frame_copy
+        except Exception as e:
+            logger.error(f"Error in read(): {e}")
+            return None
 
     def get_jpeg(self):
-        frame = self.read()
-        if frame is None:
+        try:
+            frame = self.read()
+            if frame is None:
+                logger.warning("No frame available for JPEG conversion")
+                return None
+            ret, jpeg = cv2.imencode('.jpg', frame)
+            if not ret:
+                logger.warning("Failed to encode frame as JPEG")
+                return None
+            return jpeg.tobytes()
+        except Exception as e:
+            logger.error(f"Error in get_jpeg: {e}")
             return None
-        ret, jpeg = cv2.imencode('.jpg', frame)
-        if not ret:
-            return None
-        return jpeg.tobytes()
 
     def stop(self):
         self.running = False
@@ -121,21 +154,18 @@ assistant = None
 def initialize_system():
     global camera, assistant
     try:
-        # Try initializing the webcam
         camera = WebcamCapture().start()
-    except RuntimeError:
-        # Fallback to a placeholder image or default behavior
-        camera = None
-        logger.warning("Webcam initialization failed. Fallback to default behavior.")
-
-    try:
+        if camera is None:
+            logger.error("Camera initialization failed")
+            raise RuntimeError("Camera initialization failed")
+            
         assistant = AIAssistant()
         logger.info("System initialized successfully")
+            
     except Exception as e:
         logger.error(f"Error initializing system: {e}")
         raise
-
-
+    
 def create_app():
     app = Flask(__name__)
 
@@ -169,6 +199,10 @@ def create_app():
     @app.route('/process_query', methods=['POST'])
     def process_query():
         try:
+            if app.camera is None:
+                logger.error("Camera is not initialized")
+                return jsonify({"error": "Camera not initialized"}), 500
+
             data = request.json
             prompt = data.get('prompt')
             if not prompt:
@@ -177,8 +211,9 @@ def create_app():
             # Get current frame and encode to base64
             frame = app.camera.read()
             if frame is None:
+                logger.error("Failed to capture frame")
                 return jsonify({"error": "Failed to capture frame"}), 500
-                
+            
             _, buffer = cv2.imencode('.jpg', frame)
             image_base64 = base64.b64encode(buffer).decode('utf-8')
 
@@ -189,6 +224,19 @@ def create_app():
         except Exception as e:
             logger.error(f"Error in process_query: {e}")
             return jsonify({"error": str(e)}), 500
+    
+    @app.route('/camera_status')
+    def camera_status():
+        if app.camera is None:
+            return jsonify({"status": "Camera not initialized"})
+            
+        status = {
+            "initialized": True,
+            "is_running": app.camera.running,
+            "stream_opened": app.camera.stream.isOpened() if app.camera.stream else False,
+            "has_frame": app.camera.frame is not None
+        }
+        return jsonify(status)
 
     @app.route('/process_frame', methods=['POST'])
     def process_frame():
@@ -220,16 +268,38 @@ def create_app():
 
 
 def generate_frames(camera):
+    frame_count = 0
+    error_count = 0
+    
     while True:
         if camera is None:
+            logger.error("Camera is None in generate_frames")
             break
-        
-        frame = camera.get_jpeg()
-        if frame is None:
-            continue
+        try:
+            frame = camera.get_jpeg()
+            frame_count += 1
             
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            if frame is None:
+                error_count += 1
+                logger.warning(f"No frame available (error {error_count} of {frame_count} frames)")
+                if error_count > 10:  # After 10 consecutive errors
+                    logger.error("Too many frame capture errors")
+                    break
+                continue
+            
+            error_count = 0  # Reset error count on successful frame
+                
+            if frame_count % 30 == 0:  # Log every 30 frames
+                logger.info(f"Successfully streaming: {frame_count} frames captured")
+                
+            yield (b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            
+        except Exception as e:
+            logger.error(f"Error in generate_frames: {e}")
+            error_count += 1
+            if error_count > 10:
+                break
 
 if __name__ == '__main__':
     load_dotenv()
