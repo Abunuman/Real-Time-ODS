@@ -70,6 +70,7 @@
     <div id="response"></div>
 
     <script>
+      let isProcessing = false;
       // Adding the new webcam functionality
       async function setupWebcam() {
         try {
@@ -117,12 +118,30 @@
         }
       }
 
-      // Keeping your existing query processing function
       async function processQuery() {
+        if (isProcessing) return;
+        isProcessing = true;
+
         const queryInput = document.getElementById("queryInput");
         const responseDiv = document.getElementById("response");
+        const video = document.getElementById("webcam");
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext("2d");
 
         try {
+          // Ensure video is playing and has dimensions
+          if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+            throw new Error("Video not ready");
+          }
+
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          context.drawImage(video, 0, 0);
+
+          // Compress image before sending
+          const frameData = canvas.toDataURL("image/jpeg", 0.7);
+          console.log("Frame data size:", frameData.length);
+
           const response = await fetch("/process_query", {
             method: "POST",
             headers: {
@@ -130,23 +149,30 @@
             },
             body: JSON.stringify({
               prompt: queryInput.value,
+              frame: frameData,
             }),
+            timeout: 30000, // 30 second timeout
           });
 
-          const data = await response.json();
-
-          if (data.error) {
-            responseDiv.textContent = `Error: ${data.error}`;
-          } else {
-            responseDiv.textContent = data.response;
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
+
+          const data = await response.json();
+          responseDiv.textContent = data.response || data.error;
         } catch (error) {
-          responseDiv.textContent = `Error: ${error.message}`;
+          console.error("Error:", error);
+          responseDiv.textContent = `Error processing request: ${error.message}`;
+        } finally {
+          isProcessing = false;
         }
       }
 
       // Initialize webcam when page loads
-      document.addEventListener("DOMContentLoaded", setupWebcam);
+      document.addEventListener("DOMContentLoaded", async () => {
+        await setupWebcam();
+        console.log("Webcam setup complete");
+      });
     </script>
   </body>
 </html>
