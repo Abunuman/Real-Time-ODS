@@ -29,26 +29,28 @@ class WebcamCapture:
         try:
             self.stream = cv2.VideoCapture(0)
             if not self.stream.isOpened():
-                logger.error("Could not open webcam")
-                raise RuntimeError("Could not initialize webcam")
-            
-            for _ in range(3):  
+                logger.warning("No webcam available - initializing in fallback mode")
+                self.stream = None
+                self.frame = None
+            else:
                 ret, self.frame = self.stream.read()
-                if ret and self.frame is not None:
-                    logger.info("Successfully captured initial frame")
-                    break
-                logger.warning("Failed to capture initial frame, retrying...")
-            
-            if self.frame is None:
-                logger.error("Could not capture any frames after multiple attempts")
-                raise RuntimeError("Failed to capture initial frame")
-            self.running = False
-            self.lock = Lock()
+                if not ret:
+                    logger.warning("Failed to capture initial frame - initializing in fallback mode")
+                    self.stream = None
+                    self.frame = None
         except Exception as e:
-            logger.error(f"Error initializing webcam: {e}")
-            raise
+            logger.warning(f"Error initializing webcam: {e} - initializing in fallback mode")
+            self.stream = None
+            self.frame = None
+        
+        self.running = False
+        self.lock = Lock()
 
     def start(self):
+        if self.stream is None:
+            logger.info("Running in fallback mode without webcam")
+            return self
+            
         if self.running:
             return self
         
@@ -199,23 +201,33 @@ def create_app():
     @app.route('/process_query', methods=['POST'])
     def process_query():
         try:
-            if app.camera is None:
-                logger.error("Camera is not initialized")
-                return jsonify({"error": "Camera not initialized"}), 500
-
             data = request.json
             prompt = data.get('prompt')
             if not prompt:
                 return jsonify({"error": "No prompt provided"}), 400
 
-            # Get current frame and encode to base64
-            frame = app.camera.read()
-            if frame is None:
-                logger.error("Failed to capture frame")
-                return jsonify({"error": "Failed to capture frame"}), 500
-            
-            _, buffer = cv2.imencode('.jpg', frame)
-            image_base64 = base64.b64encode(buffer).decode('utf-8')
+            # Handle case where frame comes from client
+            frame_data = data.get('frame')  # Get frame from client
+            if frame_data:
+                try:
+                    # Remove data URL prefix if present
+                    if ',' in frame_data:
+                        frame_data = frame_data.split(',')[1]
+                    # Use frame data directly for AI processing
+                    image_base64 = frame_data
+                except Exception as e:
+                    logger.error(f"Error processing client frame: {e}")
+                    return jsonify({"error": "Failed to process frame"}), 500
+            else:
+                # Fallback to server camera if available
+                if app.camera and app.camera.frame is not None:
+                    frame = app.camera.read()
+                    if frame is None:
+                        return jsonify({"error": "Failed to capture frame"}), 500
+                    _, buffer = cv2.imencode('.jpg', frame)
+                    image_base64 = base64.b64encode(buffer).decode('utf-8')
+                else:
+                    return jsonify({"error": "No frame available"}), 400
 
             # Process with AI assistant
             response = app.assistant.process_query(prompt, image_base64)
