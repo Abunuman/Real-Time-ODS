@@ -2,3 +2,6 @@
 .venv
 =0.3.0
 .github
+venv/
+
+# Ignore venv 
